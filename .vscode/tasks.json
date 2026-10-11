@@ -1,0 +1,50 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Zephyr: Build",
+      "detail": "west build for esp32s3_devkitc/esp32s3/procpu (16 MB flash)",
+      "type": "shell",
+      "command": "west build -b esp32s3_devkitc/esp32s3/procpu -S espressif-flash-16M .",
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": ["$gcc"],
+      "group": { "kind": "build", "isDefault": true }
+    },
+    {
+      "label": "Zephyr: Pristine Build",
+      "detail": "Same as Build, but discards the existing build directory first",
+      "type": "shell",
+      "command": "west build -p always -b esp32s3_devkitc/esp32s3/procpu -S espressif-flash-16M .",
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": ["$gcc"],
+      "group": "build"
+    },
+    {
+      "label": "Zephyr: Flash",
+      "detail": "Flash via esptool; port comes from $ESPTOOL_PORT",
+      "type": "shell",
+      "command": "west flash",
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": [],
+      "dependsOn": "Zephyr: Build"
+    },
+    {
+      "label": "Zephyr: Monitor",
+      "detail": "Serial console at 115200 baud. Exit with Ctrl-A Ctrl-X",
+      "type": "shell",
+      "command": "picocom -b 115200 ${env:ESPTOOL_PORT}",
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": [],
+      "presentation": { "panel": "dedicated", "focus": true }
+    },
+    {
+      "label": "Zephyr: Menuconfig",
+      "detail": "Interactive Kconfig editor for the current build",
+      "type": "shell",
+      "command": "west build -t menuconfig",
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": [],
+      "presentation": { "panel": "dedicated", "focus": true }
+    }
+  ]
+}

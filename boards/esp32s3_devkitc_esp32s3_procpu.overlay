@@ -1,0 +1,46 @@
+/*
+ * Copyright (c) 2026 Ralf Hochhausen
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * The upstream esp32s3_devkitc board only defines the i2c-0, watchdog0,
+ * uart-0 and sw0 aliases - there is no "leds" node and no led0 alias, so
+ * any GPIO-LED application fails to build without this overlay.
+ *
+ * The only onboard LED is an addressable WS2812 RGB LED on GPIO38 (board
+ * revision v1.1 moved it to GPIO48), and Zephyr 4.4 has no RMT-based WS2812
+ * driver. We therefore drive an external LED on a plain GPIO instead.
+ *
+ * Wiring:  GPIO2 --[ 330 ohm ]--|>|-- GND
+ *                              LED
+ */
+
+#include <zephyr/dt-bindings/gpio/gpio.h>
+
+/ {
+	aliases {
+		led0 = &led_ext;
+	};
+
+	leds {
+		compatible = "gpio-leds";
+
+		/*
+		 * ESP32-S3 GPIO banks: pins 0..31 -> &gpio0,
+		 *                      pins 32..48 -> &gpio1 (index = pin - 32).
+		 *
+		 * GPIO2 is free and broken out on the header. Do not use:
+		 *   GPIO26-32  SPI flash
+		 *   GPIO33-37  octal PSRAM (the "R8" in N16R8)
+		 *   GPIO43/44  UART0 TX/RX -> console
+		 *   GPIO19/20  native USB D-/D+
+		 *   GPIO0/45/46  boot strapping pins
+		 *   GPIO38 (v1.0) / GPIO48 (v1.1)  onboard WS2812 RGB LED
+		 * Other safe choices: GPIO1, 4, 5, 6, 7, 15, 16, 17, 18, 21.
+		 */
+		led_ext: led_0 {
+			gpios = <&gpio0 2 GPIO_ACTIVE_HIGH>;
+			label = "External LED";
+		};
+	};
+};
