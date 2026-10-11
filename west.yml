@@ -1,0 +1,29 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# West manifest for the rescue-buoy project (T2 "star" topology):
+# this repository IS the manifest repository, and all dependencies are
+# fetched into deps/ which is backed by a named Docker volume.
+
+manifest:
+  remotes:
+    - name: zephyrproject-rtos
+      url-base: https://github.com/zephyrproject-rtos
+
+  projects:
+    - name: zephyr
+      remote: zephyrproject-rtos
+      revision: v4.4.0
+      import:
+        # path-prefix applies to zephyr itself AND to every imported project,
+        # so all dependencies land under deps/ (the named Docker volume).
+        path-prefix: deps
+        # name-allowlist => ONLY these modules are cloned, which keeps the
+        # workspace at a few hundred MB instead of the ~8 GB full checkout.
+        # If a build fails on a missing module, add its name here and re-run
+        # `west update`.
+        name-allowlist:
+          - hal_espressif   # ESP32-S3 SoC support, ESP_IDF_PATH, RF blobs
+          - picolibc        # default C library module
+
+  self:
+    path: rescue-buoy
