@@ -8,7 +8,8 @@ host beyond Docker and the Dev Containers extension.
 | | |
 | --- | --- |
 | Zephyr | `v4.4.0` (pinned in [`west.yml`](west.yml)) |
-| Zephyr SDK | `1.0.1` (from the base image, matches Zephyr's `SDK_VERSION`) |
+| Zephyr SDK | `1.0.1` (matches Zephyr's `SDK_VERSION`), one toolchain: `xtensa-espressif_esp32s3_zephyr-elf` |
+| Dev container | built from `ubuntu:24.04`, **2.8 GB** (see [Dev container image](#dev-container-image)) |
 | Board target | `esp32s3_devkitc/esp32s3/procpu` |
 | Console | `uart0` @ 115200 baud, over the **UART** USB port (CH343 bridge) |
 
@@ -40,6 +41,15 @@ GPIO2 ──[ 330 Ω ]──▶|── GND
 To use a different pin, edit [`boards/esp32s3_devkitc_esp32s3_procpu.overlay`](boards/esp32s3_devkitc_esp32s3_procpu.overlay);
 that file also lists the pins that are **not** safe to use on this module.
 
+> **On this bench the blink is invisible, and that is not a bug.** The DevKit sits in a
+> *Meshnology Extension Board for ESP32/ESP32-S3*, where GPIO2 drives no usable LED. The
+> pin was measured on 2026-10-11 and toggles exactly as programmed; the extension board
+> simply does not route it to anything, and no pinout for it is published.
+> **Treat the serial console as the authoritative signal that the firmware runs, not the
+> LED.** For a visible blink, wire a discrete LED as drawn above, retarget the overlay to
+> a pin the extension board does drive, or take the WS2812 route (GPIO38 on board rev
+> v1.0, GPIO48 on v1.1).
+
 ## Getting started
 
 1. **Plug the board in first.** The container claims `/dev/ttyACM0` at startup via
@@ -67,7 +77,8 @@ Expected output:
 [00:00:00.123,000] <inf> main: Blinking LED on gpio@60004000 pin 2 every 500 ms
 ```
 
-…and the LED blinks at 1 Hz.
+GPIO2 toggles every 500 ms. Whether that is *visible* depends on the board the DevKit is
+plugged into — see the note under [Hardware setup](#hardware-setup).
 
 ## Permissions and file ownership
 
@@ -92,7 +103,7 @@ Two things do *not* live in this directory and are therefore not removed that wa
 | What | How to remove it |
 | --- | --- |
 | Zephyr + modules (`deps/`, a named Docker volume) | `docker volume rm rescue-buoy-west-deps` |
-| The container image (SDK, toolchain) | `docker rmi` / `docker system prune` |
+| The container image (2.8 GB: SDK, toolchain, Python venv) | `docker rmi` / `docker system prune` |
 
 Both work without sudo because your user is in the `docker` group.
 
@@ -134,6 +145,38 @@ The `espressif-flash-16M` snippet matches the N16R8's 16 MB flash. The 8 MB octa
 west build -b esp32s3_devkitc/esp32s3/procpu \
            -S espressif-flash-16M -S espressif-psram-8M .
 ```
+
+## Dev container image
+
+[`.devcontainer/Dockerfile`](.devcontainer/Dockerfile) builds the image from
+`ubuntu:24.04` in two stages and installs the Zephyr SDK **minimal** bundle plus
+exactly one toolchain, `xtensa-espressif_esp32s3_zephyr-elf`. The SDK tarballs are
+downloaded in the first stage and never reach the final image.
+
+The obvious alternative is what increment 1 did: base on
+`ghcr.io/zephyrproject-rtos/zephyr-build`, which installs the SDK with `setup.sh -t all`
+— 35 GNU toolchains plus LLVM plus a VNC desktop — and costs **31.9 GB**. Even
+`ci-base` alone is 2.73 GB compressed, so no upstream image can reach this size.
+
+| Part | Size |
+| --- | --- |
+| `ubuntu:24.04` | 88 MB |
+| apt packages | 497 MB |
+| Python venv (Zephyr's `requirements-base.txt` + esptool) | 96 MB |
+| SDK host tools, `hosttools/` | 1.2 GB |
+| SDK toolchain, `gnu/` | 195 MB |
+| **total** | **2.8 GB** |
+
+Three pins have to be bumped together: the `zephyr` revision in [`west.yml`](west.yml),
+`ZSDK_VERSION` (Zephyr `v4.4.0` pins SDK `1.0.1`) and `ZSDK_TOOLCHAIN`. `ZSDK_DIR` is
+kept at the path the old base image used, `/opt/toolchains`, so build output stays
+comparable across the switch.
+
+Those 1.2 GB of SDK host tools are, for this board, dead weight: 575 MB of it is QEMU
+for foreign architectures, and the bundled openocd is rejected outright by the board's
+`board.cmake`, which accepts only Espressif's `openocd-esp32` fork. They are kept for
+now rather than cutting into a vendor tree — dropping them would take the image to
+roughly 1.5 GB.
 
 ## Troubleshooting
 
